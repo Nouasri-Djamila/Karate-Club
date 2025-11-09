@@ -4,7 +4,7 @@ import * as THREE from 'three';
 const App = () => {
   const [graphData, setGraphData] = useState(null);
   const [selectedNode, setSelectedNode] = useState(null);
-  const [stats, setStats] = useState(null);
+  const [metrics, setMetrics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [centralityType, setCentralityType] = useState('betweenness');
@@ -17,6 +17,8 @@ const App = () => {
   const [deleteEdgeSource, setDeleteEdgeSource] = useState('');
   const [deleteEdgeTarget, setDeleteEdgeTarget] = useState('');
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [showMatrix, setShowMatrix] = useState(false);
+  const [adjacencyMatrix, setAdjacencyMatrix] = useState(null);
   
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
@@ -46,12 +48,23 @@ const App = () => {
       }
       const data = await response.json();
       setGraphData(data);
-      setStats(data.stats);
+      setMetrics(data.metrics);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching graph:', err);
       setError(err.message);
       setLoading(false);
+    }
+  };
+
+  const fetchMatrix = async () => {
+    try {
+      const response = await fetch('http://127.0.0.1:5000/api/adjacency-matrix');
+      const data = await response.json();
+      setAdjacencyMatrix(data);
+      setShowMatrix(true);
+    } catch (err) {
+      alert('Erreur lors du chargement de la matrice: ' + err.message);
     }
   };
 
@@ -113,7 +126,7 @@ const App = () => {
   };
 
   const deleteNode = async (nodeId) => {
-    if (!confirm(`Supprimer le nœud ${nodeId} ?`)) return;
+    if (!window.confirm(`Supprimer le nœud ${nodeId} ?`)) return;
     try {
       const response = await fetch(`http://127.0.0.1:5000/api/node/${nodeId}`, {
         method: 'DELETE',
@@ -128,16 +141,16 @@ const App = () => {
   };
 
   const exportCSV = () => {
-    if (!graphData) return;
-    let csv = 'Node,Degree,Clustering,Degree_Centrality,Betweenness,Closeness,Eigenvector\n';
+    if (!graphData || !metrics) return;
+    let csv = 'Node,Degree,Clustering,Triangles,K_Core,Degree_Centrality,Betweenness,Closeness,Eigenvector\n';
     graphData.nodes.forEach(node => {
-      csv += `${node.id},${node.degree},${node.clustering},${node.centrality.degree},${node.centrality.betweenness},${node.centrality.closeness},${node.centrality.eigenvector}\n`;
+      csv += `${node.id},${node.degree},${node.clustering},${node.triangles},${node.k_core},${node.centrality.degree},${node.centrality.betweenness},${node.centrality.closeness},${node.centrality.eigenvector}\n`;
     });
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'karate_club_graph.csv';
+    a.download = 'karate_club_analysis.csv';
     a.click();
   };
 
@@ -161,12 +174,10 @@ const App = () => {
     controls.edges = [];
     controls.labels = [];
 
-    // Scene setup
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xffffff);
     sceneRef.current = scene;
 
-    // Camera
     const camera = new THREE.PerspectiveCamera(
       75,
       (window.innerWidth * 0.7) / (window.innerHeight * 0.9),
@@ -177,13 +188,11 @@ const App = () => {
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
-    // Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
     renderer.setSize(window.innerWidth * 0.7, window.innerHeight * 0.9);
     mountRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     scene.add(ambientLight);
 
@@ -195,31 +204,26 @@ const App = () => {
     directionalLight2.position.set(-10, -5, -10);
     scene.add(directionalLight2);
 
-    // Grid
     const gridHelper = new THREE.GridHelper(50, 50, 0xcccccc, 0xeeeeee);
     scene.add(gridHelper);
 
-    // Trouver les valeurs min et max pour normalisation
     const centralityValues = graphData.nodes.map(n => n.centrality[centralityType]);
     const minCentrality = Math.min(...centralityValues);
     const maxCentrality = Math.max(...centralityValues);
 
-    // Create nodes with labels INSIDE
     graphData.nodes.forEach(node => {
       const geometry = new THREE.SphereGeometry(0.5, 32, 32);
       
-      // Normaliser selon le type de centralité choisi
       let normalizedValue = 
         (node.centrality[centralityType] - minCentrality) / (maxCentrality - minCentrality);
       
-      // Choisir UNE couleur pure
       let baseColor;
       if (normalizedValue < 0.33) {
-        baseColor = new THREE.Color(0xff6b6b); // Rouge
+        baseColor = new THREE.Color(0xff6b6b);
       } else if (normalizedValue < 0.66) {
-        baseColor = new THREE.Color(0xffd93d); // Jaune
+        baseColor = new THREE.Color(0xffd93d);
       } else {
-        baseColor = new THREE.Color(0x6bcf7f); // Vert
+        baseColor = new THREE.Color(0x6bcf7f);
       }
       
       const material = new THREE.MeshStandardMaterial({
@@ -234,7 +238,6 @@ const App = () => {
       scene.add(sphere);
       controls.nodes.push(sphere);
 
-      // Label INSIDE
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
       canvas.width = 128;
@@ -265,7 +268,6 @@ const App = () => {
       controls.labels.push(sprite);
     });
 
-    // Create edges
     graphData.edges.forEach(edge => {
       const sourceNode = graphData.nodes.find(n => n.id === edge.source);
       const targetNode = graphData.nodes.find(n => n.id === edge.target);
@@ -286,16 +288,12 @@ const App = () => {
       controls.edges.push(line);
     });
 
-    // Mouse interaction
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
 
     const onMouseDown = (event) => {
       controls.isDragging = true;
-      controls.previousMouse = {
-        x: event.clientX,
-        y: event.clientY
-      };
+      controls.previousMouse = { x: event.clientX, y: event.clientY };
     };
 
     const onMouseUp = () => {
@@ -314,20 +312,12 @@ const App = () => {
         controls.targetRotation.y += deltaX * 0.005;
         controls.targetRotation.x += deltaY * 0.005;
 
-        controls.previousMouse = {
-          x: event.clientX,
-          y: event.clientY
-        };
+        controls.previousMouse = { x: event.clientX, y: event.clientY };
         renderer.domElement.style.cursor = 'grabbing';
       } else {
         raycaster.setFromCamera(mouse, camera);
         const intersects = raycaster.intersectObjects(controls.nodes);
-
-        if (intersects.length > 0) {
-          renderer.domElement.style.cursor = 'pointer';
-        } else {
-          renderer.domElement.style.cursor = 'grab';
-        }
+        renderer.domElement.style.cursor = intersects.length > 0 ? 'pointer' : 'grab';
       }
     };
 
@@ -368,7 +358,6 @@ const App = () => {
     renderer.domElement.addEventListener('wheel', onWheel, { passive: false });
     renderer.domElement.style.cursor = 'grab';
 
-    // Animation
     const animate = () => {
       requestAnimationFrame(animate);
       
@@ -432,7 +421,7 @@ const App = () => {
 
   const getCentralityInterpretation = () => {
     const interpretations = {
-      degree: 'Les nœuds verts ont le plus de connexions directes. Ils sont les plus populaires et influents localement dans le réseau.',
+      degree: 'Les nœuds verts ont le plus de connexions directes. Ils sont les plus populaires et influents localement.',
       betweenness: 'Les nœuds verts sont des ponts essentiels. Ils contrôlent le flux d\'information entre différentes parties du réseau.',
       closeness: 'Les nœuds verts peuvent atteindre tous les autres nœuds rapidement. Ils sont centraux dans la structure globale.',
       eigenvector: 'Les nœuds verts sont connectés à d\'autres nœuds importants. Leur influence provient de la qualité de leurs connexions.'
@@ -470,7 +459,6 @@ const App = () => {
 
       <div style={styles.container}>
         <div style={styles.canvasContainer}>
-          {/* Légende en haut à gauche */}
           <div style={styles.legend}>
             <div style={styles.legendTitle}>{getCentralityLabel()}</div>
             <div style={styles.legendRow}>
@@ -491,7 +479,6 @@ const App = () => {
         </div>
 
         <div style={styles.sidebar}>
-          {/* Type de centralité */}
           <div style={styles.panel}>
             <h2 style={styles.panelTitle}>TYPE DE CENTRALITÉ</h2>
             <select 
@@ -509,58 +496,126 @@ const App = () => {
             </div>
           </div>
 
-          {/* Statistiques */}
           <div style={styles.panel}>
-            <h2 style={styles.panelTitle}>STATISTIQUES</h2>
+            <h2 style={styles.panelTitle}>STATISTIQUES DE BASE</h2>
             <div style={styles.metric}>
-              <span style={styles.label}>NŒUDS</span>
-              <span style={styles.value}>{stats?.num_nodes}</span>
+              <span style={styles.label}>ORDRE (NŒUDS)</span>
+              <span style={styles.value}>{metrics?.ordre}</span>
             </div>
             <div style={styles.metric}>
-              <span style={styles.label}>ARÊTES</span>
-              <span style={styles.value}>{stats?.num_edges}</span>
+              <span style={styles.label}>TAILLE (ARÊTES)</span>
+              <span style={styles.value}>{metrics?.taille}</span>
             </div>
             <div style={styles.metric}>
               <span style={styles.label}>DENSITÉ</span>
-              <span style={styles.value}>{stats?.density.toFixed(3)}</span>
+              <span style={styles.value}>{metrics?.densite.toFixed(3)}</span>
             </div>
             <div style={styles.metric}>
-              <span style={styles.label}>CLUSTERING</span>
-              <span style={styles.value}>{stats?.avg_clustering.toFixed(3)}</span>
-            </div>
-            <div style={styles.metric}>
-              <span style={styles.label}>TRIANGLES</span>
-              <span style={styles.value}>{stats?.triangles}</span>
+              <span style={styles.label}>TYPE</span>
+              <span style={styles.value}>Non orienté</span>
             </div>
           </div>
 
-          {/* Motifs et structures */}
           <div style={styles.panel}>
-            <h2 style={styles.panelTitle}>MOTIFS & STRUCTURES</h2>
+            <h2 style={styles.panelTitle}>DISTRIBUTION DES DEGRÉS</h2>
             <div style={styles.metric}>
-              <span style={styles.label}>TRIANGLES</span>
-              <span style={styles.value}>{stats?.triangles || 0}</span>
-            </div>
-            <div style={styles.motifDescription}>
-              Les triangles indiquent des groupes de 3 personnes mutuellement connectées. Plus il y en a, plus le réseau a des communautés serrées.
+              <span style={styles.label}>MIN</span>
+              <span style={styles.value}>{metrics?.degree_distribution.min}</span>
             </div>
             <div style={styles.metric}>
-              <span style={styles.label}>CLIQUES MAX</span>
-              <span style={styles.value}>~5-6</span>
-            </div>
-            <div style={styles.motifDescription}>
-              Les cliques maximales sont les sous-groupes complets les plus grands. Dans ce réseau, les plus grandes cliques contiennent environ 5-6 membres.
+              <span style={styles.label}>MAX</span>
+              <span style={styles.value}>{metrics?.degree_distribution.max}</span>
             </div>
             <div style={styles.metric}>
-              <span style={styles.label}>K-CORES</span>
-              <span style={styles.value}>4 niveaux</span>
+              <span style={styles.label}>MOYENNE</span>
+              <span style={styles.value}>{metrics?.degree_distribution.mean.toFixed(2)}</span>
             </div>
-            <div style={styles.motifDescription}>
-              Les k-cores révèlent la structure hiérarchique : le noyau central (4-core) contient les membres les plus interconnectés.
+            <div style={styles.metric}>
+              <span style={styles.label}>MÉDIANE</span>
+              <span style={styles.value}>{metrics?.degree_distribution.median.toFixed(2)}</span>
             </div>
           </div>
 
-          {/* Nœud sélectionné */}
+          <div style={styles.panel}>
+            <h2 style={styles.panelTitle}>CLUSTERING</h2>
+            <div style={styles.metric}>
+              <span style={styles.label}>COEFFICIENT MOYEN</span>
+              <span style={styles.value}>{metrics?.avg_clustering.toFixed(3)}</span>
+            </div>
+            <div style={styles.metric}>
+              <span style={styles.label}>TRANSITIVITÉ</span>
+              <span style={styles.value}>{metrics?.transitivite.toFixed(3)}</span>
+            </div>
+            <div style={styles.motifDescription}>
+              Le coefficient élevé indique des groupes cohésifs avec forte tendance à former des triangles.
+            </div>
+          </div>
+
+          <div style={styles.panel}>
+            <h2 style={styles.panelTitle}>MOTIFS FRÉQUENTS</h2>
+            <div style={styles.metric}>
+              <span style={styles.label}>TRIANGLES</span>
+              <span style={styles.value}>{metrics?.triangles}</span>
+            </div>
+            <div style={styles.motifDescription}>
+              Groupes de 3 personnes mutuellement connectées. Signe de relations sociales étroites.
+            </div>
+            <div style={styles.metric}>
+              <span style={styles.label}>CHAÎNES (A-B-C)</span>
+              <span style={styles.value}>{metrics?.paths_3}</span>
+            </div>
+            <div style={styles.motifDescription}>
+              Chemins de 3 nœuds où A et C ne sont pas directement connectés.
+            </div>
+            <div style={styles.metric}>
+              <span style={styles.label}>ÉTOILES LOCALES</span>
+              <span style={styles.value}>{metrics?.nb_etoiles}</span>
+            </div>
+            <div style={styles.motifDescription}>
+              Nœuds centraux avec ≥3 voisins mais sans triangles (hub sans clustering).
+            </div>
+          </div>
+
+          <div style={styles.panel}>
+            <h2 style={styles.panelTitle}>CLIQUES</h2>
+            <div style={styles.metric}>
+              <span style={styles.label}>NOMBRE TOTAL</span>
+              <span style={styles.value}>{metrics?.nb_cliques}</span>
+            </div>
+            <div style={styles.metric}>
+              <span style={styles.label}>TAILLE MAXIMALE</span>
+              <span style={styles.value}>{metrics?.max_clique_size}</span>
+            </div>
+            <div style={styles.motifDescription}>
+              Plus grande clique: nœuds {metrics?.max_clique?.join(', ')}
+            </div>
+            <h3 style={styles.panelSubtitle}>DISTRIBUTION</h3>
+            {metrics?.clique_distribution && Object.entries(metrics.clique_distribution).map(([size, count]) => (
+              <div key={size} style={styles.metric}>
+                <span style={styles.label}>CLIQUES DE TAILLE {size}</span>
+                <span style={styles.value}>{count}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={styles.panel}>
+            <h2 style={styles.panelTitle}>K-CORES</h2>
+            <div style={styles.metric}>
+              <span style={styles.label}>K-CORE MAXIMUM</span>
+              <span style={styles.value}>{metrics?.max_k_core}</span>
+            </div>
+            <div style={styles.motifDescription}>
+              Le noyau central (k={metrics?.max_k_core}) contient les membres les plus interconnectés.
+            </div>
+            <h3 style={styles.panelSubtitle}>DISTRIBUTION</h3>
+            {metrics?.k_core_distribution && Object.entries(metrics.k_core_distribution).map(([k, count]) => (
+              <div key={k} style={styles.metric}>
+                <span style={styles.label}>{k}-CORE</span>
+                <span style={styles.value}>{count} nœuds</span>
+              </div>
+            ))}
+          </div>
+
           {selectedNode && (
             <div style={styles.panel}>
               <h2 style={styles.panelTitle}>NŒUD #{selectedNode.id}</h2>
@@ -571,6 +626,14 @@ const App = () => {
               <div style={styles.metric}>
                 <span style={styles.label}>CLUSTERING</span>
                 <span style={styles.value}>{selectedNode.clustering.toFixed(3)}</span>
+              </div>
+              <div style={styles.metric}>
+                <span style={styles.label}>TRIANGLES</span>
+                <span style={styles.value}>{selectedNode.triangles}</span>
+              </div>
+              <div style={styles.metric}>
+                <span style={styles.label}>K-CORE</span>
+                <span style={styles.value}>{selectedNode.k_core}</span>
               </div>
               <h3 style={styles.panelSubtitle}>CENTRALITÉS</h3>
               <div style={styles.metric}>
@@ -595,7 +658,6 @@ const App = () => {
             </div>
           )}
 
-          {/* Actions */}
           <div style={styles.panel}>
             <h2 style={styles.panelTitle}>ACTIONS</h2>
             
@@ -662,44 +724,88 @@ const App = () => {
             )}
           </div>
 
-          {/* Export */}
           <div style={styles.panel}>
-            <h2 style={styles.panelTitle}>EXPORT</h2>
-            <button onClick={exportCSV} style={styles.button}> EXPORTER CSV</button>
-            <button onClick={exportPNG} style={styles.button}>EXPORTER PNG</button>
-          </div>
-
-          {/* Analyse */}
-          <div style={styles.panel}>
-            <h2 style={styles.panelTitle}>ANALYSE</h2>
-            <button onClick={() => setShowAnalysis(!showAnalysis)} style={styles.button}>
-              {showAnalysis ? 'MASQUER' : 'AFFICHER ANALYSE'}
+            <h2 style={styles.panelTitle}>MATRICE D'ADJACENCE</h2>
+            <button onClick={fetchMatrix} style={styles.button}>
+              {showMatrix ? 'MASQUER MATRICE' : 'AFFICHER MATRICE'}
             </button>
-            {showAnalysis && (
-              <div style={styles.analysisText}>
-                <p><strong> Réseau de Zachary:</strong> Ce graphe représente les interactions sociales dans un club de karaté universitaire, étudié par Wayne Zachary en 1977.</p>
-                
-                <p><strong> Structure Générale:</strong> Le réseau contient {stats?.num_nodes} membres connectés par {stats?.num_edges} interactions. La densité de {stats?.density.toFixed(3)} indique un réseau moyennement connecté où environ {(stats?.density * 100).toFixed(1)}% des connexions possibles existent.</p>
-                
-                <p><strong> Cohésion Sociale:</strong> Le coefficient de clustering moyen de {stats?.avg_clustering.toFixed(3)} révèle une forte tendance à former des groupes ("l'ami de mon ami est mon ami"). Cela indique des sous-communautés bien définies.</p>
-                
-                <p><strong> Motifs Triangulaires:</strong> Les {stats?.triangles} triangles détectés représentent des triades fermées, signe de relations sociales fortes et de confiance mutuelle entre trios de membres.</p>
-                
-                <p><strong> Nœuds Clés:</strong> Les nœuds verts (haute centralité {centralityType}) jouent un rôle crucial :
-                  {centralityType === 'betweenness' && ' Ils sont des ponts entre communautés et leur retrait fragmenterait le réseau.'}
-                  {centralityType === 'degree' && ' Ils ont le plus de connexions directes et sont les leaders naturels.'}
-                  {centralityType === 'closeness' && ' Ils peuvent communiquer rapidement avec tous les autres membres.'}
-                  {centralityType === 'eigenvector' && ' Ils sont connectés aux membres les plus influents du réseau.'}
-                </p>
-                
-                <p><strong> Hiérarchie:</strong> Les k-cores révèlent une structure en couches : le noyau central (4-core) contient les membres les plus engagés et interconnectés, entourés de membres périphériques moins connectés.</p>
-                
-                <p><strong> Contexte Historique:</strong> Ce réseau a capturé la division réelle du club en deux groupes suite à un conflit entre l'instructeur (nœud 0) et l'administrateur (nœud 33). La structure prédit cette scission avec une précision remarquable.</p>
+            {showMatrix && adjacencyMatrix && (
+              <div style={styles.matrixContainer}>
+                <div style={styles.matrixScroll}>
+                  <table style={styles.matrixTable}>
+                    <thead>
+                      <tr>
+                        <th style={styles.matrixHeader}></th>
+                        {adjacencyMatrix.nodes.map(node => (
+                          <th key={node} style={styles.matrixHeader}>{node}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {adjacencyMatrix.matrix.map((row, i) => (
+                        <tr key={i}>
+                          <th style={styles.matrixHeader}>{adjacencyMatrix.nodes[i]}</th>
+                          {row.map((cell, j) => (
+                            <td key={j} style={{
+                              ...styles.matrixCell,
+                              background: cell === 1 ? '#e3f2fd' : '#fff'
+                            }}>
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Controls */}
+          <div style={styles.panel}>
+            <h2 style={styles.panelTitle}>EXPORT</h2>
+            <button onClick={exportCSV} style={styles.button}>💾 EXPORTER CSV</button>
+            <button onClick={exportPNG} style={styles.button}>🖼️ EXPORTER PNG</button>
+          </div>
+
+          <div style={styles.panel}>
+            <h2 style={styles.panelTitle}>ANALYSE DÉTAILLÉE</h2>
+            <button onClick={() => setShowAnalysis(!showAnalysis)} style={styles.button}>
+              {showAnalysis ? 'MASQUER' : 'AFFICHER ANALYSE'}
+            </button>
+            {showAnalysis && metrics && (
+              <div style={styles.analysisText}>
+                <p><strong>📚 Réseau de Zachary:</strong> Ce graphe représente les interactions sociales dans un club de karaté universitaire, étudié par Wayne Zachary en 1977.</p>
+                
+                <p><strong>📊 Structure Générale:</strong> Le réseau contient {metrics.ordre} membres connectés par {metrics.taille} interactions. La densité de {metrics.densite.toFixed(3)} indique un réseau moyennement connecté où environ {(metrics.densite * 100).toFixed(1)}% des connexions possibles existent.</p>
+                
+                <p><strong>🔗 Distribution des Degrés:</strong> Les degrés varient de {metrics.degree_distribution.min} à {metrics.degree_distribution.max} avec une moyenne de {metrics.degree_distribution.mean.toFixed(2)}. Cette variance indique une hiérarchie claire entre membres périphériques et centraux.</p>
+                
+                <p><strong>👥 Cohésion Sociale:</strong> Le coefficient de clustering moyen de {metrics.avg_clustering.toFixed(3)} révèle une forte tendance à former des groupes ("l'ami de mon ami est mon ami"). La transitivité de {metrics.transitivite.toFixed(3)} confirme cette cohésion.</p>
+                
+                <p><strong>🔺 Motifs Triangulaires:</strong> Les {metrics.triangles} triangles détectés représentent des triades fermées, signe de relations sociales fortes et de confiance mutuelle. Les {metrics.paths_3} chaînes ouvertes montrent aussi des connexions indirectes potentielles.</p>
+                
+                <p><strong>⭐ Étoiles et Hubs:</strong> {metrics.nb_etoiles} nœuds agissent comme des "étoiles locales" - des connecteurs sans former de triangles, jouant un rôle de pont entre groupes.</p>
+                
+                <p><strong>🎯 Cliques:</strong> Le réseau contient {metrics.nb_cliques} cliques au total. La plus grande clique (taille {metrics.max_clique_size}) regroupe les nœuds {metrics.max_clique.join(', ')} - un sous-groupe complètement interconnecté.</p>
+                
+                <p><strong>🔄 K-Cores:</strong> Le k-core maximum est {metrics.max_k_core}, révélant une structure en couches. Le noyau central ({metrics.max_k_core}-core) contient les membres les plus engagés et interconnectés.</p>
+                
+                <p><strong>👑 Nœuds Clés:</strong> Les analyses de centralité révèlent que les nœuds {metrics.top_centralities.betweenness.slice(0, 3).map(n => n.node).join(', ')} sont les plus cruciaux. Le nœud 0 (instructeur) et le nœud 33 (administrateur) dominent plusieurs métriques.</p>
+                
+                {metrics.diameter && (
+                  <p><strong>📏 Distances:</strong> Le diamètre du réseau est {metrics.diameter} (distance maximale entre deux nœuds) et le rayon est {metrics.radius}. Le chemin moyen de {metrics.avg_shortest_path.toFixed(2)} indique que les membres sont en moyenne à environ {Math.round(metrics.avg_shortest_path)} pas les uns des autres.</p>
+                )}
+                
+                {metrics.assortativity !== null && (
+                  <p><strong>🔀 Assortativité:</strong> Le coefficient d'assortativité de {metrics.assortativity.toFixed(3)} indique {metrics.assortativity > 0 ? 'une tendance des nœuds similaires (en degré) à se connecter ensemble' : 'une tendance des nœuds de degrés différents à se connecter (structure hub-and-spoke)'}.</p>
+                )}
+                
+                <p><strong>⚔️ Contexte Historique:</strong> Ce réseau a capturé la division réelle du club en deux groupes suite à un conflit entre l'instructeur (nœud 0) et l'administrateur (nœud 33). La structure prédisait cette scission avec une précision remarquable, validant les méthodes d'analyse de réseaux sociaux.</p>
+              </div>
+            )}
+          </div>
+
           <div style={styles.panel}>
             <h2 style={styles.panelTitle}>CONTRÔLES</h2>
             <button onClick={fetchGraphData} style={styles.button}>🔄 ACTUALISER</button>
@@ -898,6 +1004,34 @@ const styles = {
     marginTop: '5px',
     marginBottom: '12px',
     fontStyle: 'italic'
+  },
+  matrixContainer: {
+    marginTop: '15px',
+    maxHeight: '400px',
+    overflow: 'auto',
+    border: '1px solid #ddd'
+  },
+  matrixScroll: {
+    overflowX: 'auto'
+  },
+  matrixTable: {
+    borderCollapse: 'collapse',
+    fontSize: '9px',
+    width: '100%'
+  },
+  matrixHeader: {
+    background: '#f5f5f5',
+    padding: '4px',
+    border: '1px solid #ddd',
+    fontWeight: 'bold',
+    minWidth: '25px',
+    textAlign: 'center'
+  },
+  matrixCell: {
+    padding: '4px',
+    border: '1px solid #ddd',
+    textAlign: 'center',
+    minWidth: '25px'
   },
   loading: {
     display: 'flex',

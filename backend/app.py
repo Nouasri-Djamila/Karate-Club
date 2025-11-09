@@ -53,18 +53,190 @@ def calculate_3d_positions(graph):
     
     return positions_3d
 
+def calculate_all_metrics(graph):
+    """
+    Calcule TOUTES les métriques demandées dans le projet :
+    - Ordre, Taille, Distribution des degrés
+    - Coefficients de clustering
+    - Motifs fréquents (triangles, chaînes, étoiles)
+    - Cliques et k-cores
+    - Centralités
+    """
+    
+    # ==========================================
+    # 1. MESURES DE BASE
+    # ==========================================
+    ordre = graph.number_of_nodes()
+    taille = graph.number_of_edges()
+    densite = float(nx.density(graph))
+    
+    # ==========================================
+    # 2. DISTRIBUTION DES DEGRÉS
+    # ==========================================
+    degres = dict(graph.degree())
+    degres_list = list(degres.values())
+    degree_distribution = {
+        'min': min(degres_list) if degres_list else 0,
+        'max': max(degres_list) if degres_list else 0,
+        'mean': float(np.mean(degres_list)) if degres_list else 0,
+        'median': float(np.median(degres_list)) if degres_list else 0,
+        'std': float(np.std(degres_list)) if degres_list else 0
+    }
+    
+    # ==========================================
+    # 3. COEFFICIENTS DE CLUSTERING
+    # ==========================================
+    clustering_coefficients = nx.clustering(graph)
+    avg_clustering = float(nx.average_clustering(graph))
+    transitivite = float(nx.transitivity(graph))
+    
+    # ==========================================
+    # 4. MOTIFS FRÉQUENTS
+    # ==========================================
+    
+    # 4.1 Triangles (3-cliques)
+    triangles_dict = nx.triangles(graph)
+    total_triangles = sum(triangles_dict.values()) // 3
+    
+    # 4.2 Chaînes de 3 nœuds (A—B—C sans lien A-C)
+    paths_3 = 0
+    for node in graph.nodes():
+        neighbors = list(graph.neighbors(node))
+        for i in range(len(neighbors)):
+            for j in range(i + 1, len(neighbors)):
+                if not graph.has_edge(neighbors[i], neighbors[j]):
+                    paths_3 += 1
+    paths_3 //= 2
+    
+    # 4.3 Étoiles locales (nœuds avec >=3 voisins mais pas de triangles)
+    etoiles = []
+    for node in graph.nodes():
+        if len(list(graph.neighbors(node))) >= 3:
+            if triangles_dict[node] == 0:
+                etoiles.append(int(node))
+    
+    # ==========================================
+    # 5. CLIQUES
+    # ==========================================
+    cliques = list(nx.find_cliques(graph))
+    nb_cliques = len(cliques)
+    max_clique = max(cliques, key=len) if cliques else []
+    max_clique_size = len(max_clique)
+    
+    # Distribution des tailles de cliques
+    clique_sizes = [len(c) for c in cliques]
+    clique_distribution = {}
+    for size in set(clique_sizes):
+        clique_distribution[size] = clique_sizes.count(size)
+    
+    # ==========================================
+    # 6. K-CORES
+    # ==========================================
+    core_numbers = nx.core_number(graph)
+    max_k_core = max(core_numbers.values()) if core_numbers else 0
+    
+    # Distribution des k-cores
+    k_core_distribution = {}
+    for k in range(max_k_core + 1):
+        nodes_in_k_core = [n for n, core in core_numbers.items() if core == k]
+        k_core_distribution[k] = len(nodes_in_k_core)
+    
+    # ==========================================
+    # 7. CENTRALITÉS
+    # ==========================================
+    degree_cent = nx.degree_centrality(graph)
+    betweenness_cent = nx.betweenness_centrality(graph)
+    closeness_cent = nx.closeness_centrality(graph)
+    eigenvector_cent = nx.eigenvector_centrality(graph, max_iter=1000)
+    
+    # Top 5 pour chaque centralité
+    top_centralities = {
+        'degree': sorted(degree_cent.items(), key=lambda x: x[1], reverse=True)[:5],
+        'betweenness': sorted(betweenness_cent.items(), key=lambda x: x[1], reverse=True)[:5],
+        'closeness': sorted(closeness_cent.items(), key=lambda x: x[1], reverse=True)[:5],
+        'eigenvector': sorted(eigenvector_cent.items(), key=lambda x: x[1], reverse=True)[:5]
+    }
+    
+    # ==========================================
+    # 8. PROPRIÉTÉS AVANCÉES
+    # ==========================================
+    
+    # Diamètre et rayon (si le graphe est connexe)
+    if nx.is_connected(graph):
+        diameter = nx.diameter(graph)
+        radius = nx.radius(graph)
+        avg_shortest_path = float(nx.average_shortest_path_length(graph))
+    else:
+        diameter = None
+        radius = None
+        avg_shortest_path = None
+    
+    # Nombre de composantes connexes
+    num_components = nx.number_connected_components(graph)
+    
+    # Assortativity (tendance des nœuds à se connecter avec des nœuds similaires)
+    try:
+        assortativity = float(nx.degree_assortativity_coefficient(graph))
+    except:
+        assortativity = None
+    
+    return {
+        # Mesures de base
+        'ordre': ordre,
+        'taille': taille,
+        'densite': densite,
+        'type_graphe': 'Non orienté, non pondéré',
+        
+        # Distribution des degrés
+        'degree_distribution': degree_distribution,
+        
+        # Clustering
+        'avg_clustering': avg_clustering,
+        'transitivite': transitivite,
+        
+        # Motifs fréquents
+        'triangles': total_triangles,
+        'paths_3': paths_3,
+        'etoiles': etoiles,
+        'nb_etoiles': len(etoiles),
+        
+        # Cliques
+        'nb_cliques': nb_cliques,
+        'max_clique': [int(n) for n in max_clique],
+        'max_clique_size': max_clique_size,
+        'clique_distribution': clique_distribution,
+        
+        # K-cores
+        'max_k_core': max_k_core,
+        'k_core_distribution': k_core_distribution,
+        
+        # Centralités (top 5)
+        'top_centralities': {
+            measure: [{'node': int(n), 'score': float(s)} for n, s in top]
+            for measure, top in top_centralities.items()
+        },
+        
+        # Propriétés avancées
+        'diameter': diameter,
+        'radius': radius,
+        'avg_shortest_path': avg_shortest_path,
+        'num_components': num_components,
+        'assortativity': assortativity
+    }
+
 @app.route('/api/graph', methods=['GET'])
 def get_graph():
-    """Retourne le graphe complet en JSON"""
+    """Retourne le graphe complet avec TOUS les calculs"""
     
     # Positions 3D
     positions = calculate_3d_positions(G)
     
-    # Centralités
+    # Centralités pour chaque nœud
     degree_cent = nx.degree_centrality(G)
     betweenness_cent = nx.betweenness_centrality(G)
     closeness_cent = nx.closeness_centrality(G)
     eigenvector_cent = nx.eigenvector_centrality(G, max_iter=1000)
+    core_numbers = nx.core_number(G)
     
     # Nœuds avec toutes leurs propriétés
     nodes = []
@@ -74,6 +246,8 @@ def get_graph():
             'position': positions[node],
             'degree': G.degree(node),
             'clustering': float(nx.clustering(G, node)),
+            'triangles': int(nx.triangles(G, node)),
+            'k_core': int(core_numbers[node]),
             'centrality': {
                 'degree': float(degree_cent[node]),
                 'betweenness': float(betweenness_cent[node]),
@@ -90,17 +264,20 @@ def get_graph():
             'target': int(edge[1])
         })
     
+    # Calculer TOUTES les métriques
+    all_metrics = calculate_all_metrics(G)
+    
     return jsonify({
         'nodes': nodes,
         'edges': edges,
-        'stats': {
-            'num_nodes': G.number_of_nodes(),
-            'num_edges': G.number_of_edges(),
-            'density': float(nx.density(G)),
-            'avg_clustering': float(nx.average_clustering(G)),
-            'triangles': sum(nx.triangles(G).values()) // 3
-        }
+        'metrics': all_metrics
     })
+
+@app.route('/api/metrics', methods=['GET'])
+def get_metrics():
+    """Endpoint dédié pour obtenir uniquement les métriques"""
+    metrics = calculate_all_metrics(G)
+    return jsonify(metrics)
 
 @app.route('/api/centrality/<measure>', methods=['GET'])
 def get_centrality(measure):
@@ -177,6 +354,17 @@ def reset_graph():
     global G
     G = create_karate_graph()
     return jsonify({'success': True})
+
+@app.route('/api/adjacency-matrix', methods=['GET'])
+def get_adjacency_matrix():
+    """Retourne la matrice d'adjacence"""
+    adj_matrix = nx.adjacency_matrix(G).todense().tolist()
+    nodes = sorted(list(G.nodes()))
+    
+    return jsonify({
+        'matrix': adj_matrix,
+        'nodes': nodes
+    })
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
