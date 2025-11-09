@@ -775,33 +775,33 @@ const App = () => {
             </button>
             {showAnalysis && metrics && (
               <div style={styles.analysisText}>
-                <p><strong>📚 Réseau de Zachary:</strong> Ce graphe représente les interactions sociales dans un club de karaté universitaire, étudié par Wayne Zachary en 1977.</p>
+                <p><strong> Réseau de Zachary:</strong> Ce graphe représente les interactions sociales dans un club de karaté universitaire, étudié par Wayne Zachary en 1977.</p>
                 
-                <p><strong>📊 Structure Générale:</strong> Le réseau contient {metrics.ordre} membres connectés par {metrics.taille} interactions. La densité de {metrics.densite.toFixed(3)} indique un réseau moyennement connecté où environ {(metrics.densite * 100).toFixed(1)}% des connexions possibles existent.</p>
+                <p><strong> Structure Générale:</strong> Le réseau contient {metrics.ordre} membres connectés par {metrics.taille} interactions. La densité de {metrics.densite.toFixed(3)} indique un réseau moyennement connecté où environ {(metrics.densite * 100).toFixed(1)}% des connexions possibles existent.</p>
                 
-                <p><strong>🔗 Distribution des Degrés:</strong> Les degrés varient de {metrics.degree_distribution.min} à {metrics.degree_distribution.max} avec une moyenne de {metrics.degree_distribution.mean.toFixed(2)}. Cette variance indique une hiérarchie claire entre membres périphériques et centraux.</p>
+                <p><strong> Distribution des Degrés:</strong> Les degrés varient de {metrics.degree_distribution.min} à {metrics.degree_distribution.max} avec une moyenne de {metrics.degree_distribution.mean.toFixed(2)}. Cette variance indique une hiérarchie claire entre membres périphériques et centraux.</p>
                 
-                <p><strong>👥 Cohésion Sociale:</strong> Le coefficient de clustering moyen de {metrics.avg_clustering.toFixed(3)} révèle une forte tendance à former des groupes ("l'ami de mon ami est mon ami"). La transitivité de {metrics.transitivite.toFixed(3)} confirme cette cohésion.</p>
+                <p><strong> Cohésion Sociale:</strong> Le coefficient de clustering moyen de {metrics.avg_clustering.toFixed(3)} révèle une forte tendance à former des groupes ("l'ami de mon ami est mon ami"). La transitivité de {metrics.transitivite.toFixed(3)} confirme cette cohésion.</p>
                 
-                <p><strong>🔺 Motifs Triangulaires:</strong> Les {metrics.triangles} triangles détectés représentent des triades fermées, signe de relations sociales fortes et de confiance mutuelle. Les {metrics.paths_3} chaînes ouvertes montrent aussi des connexions indirectes potentielles.</p>
+                <p><strong> Motifs Triangulaires:</strong> Les {metrics.triangles} triangles détectés représentent des triades fermées, signe de relations sociales fortes et de confiance mutuelle. Les {metrics.paths_3} chaînes ouvertes montrent aussi des connexions indirectes potentielles.</p>
                 
-                <p><strong>⭐ Étoiles et Hubs:</strong> {metrics.nb_etoiles} nœuds agissent comme des "étoiles locales" - des connecteurs sans former de triangles, jouant un rôle de pont entre groupes.</p>
+                <p><strong> Étoiles et Hubs:</strong> {metrics.nb_etoiles} nœuds agissent comme des "étoiles locales" - des connecteurs sans former de triangles, jouant un rôle de pont entre groupes.</p>
                 
-                <p><strong>🎯 Cliques:</strong> Le réseau contient {metrics.nb_cliques} cliques au total. La plus grande clique (taille {metrics.max_clique_size}) regroupe les nœuds {metrics.max_clique.join(', ')} - un sous-groupe complètement interconnecté.</p>
+                <p><strong> Cliques:</strong> Le réseau contient {metrics.nb_cliques} cliques au total. La plus grande clique (taille {metrics.max_clique_size}) regroupe les nœuds {metrics.max_clique.join(', ')} - un sous-groupe complètement interconnecté.</p>
                 
-                <p><strong>🔄 K-Cores:</strong> Le k-core maximum est {metrics.max_k_core}, révélant une structure en couches. Le noyau central ({metrics.max_k_core}-core) contient les membres les plus engagés et interconnectés.</p>
+                <p><strong>K-Cores:</strong> Le k-core maximum est {metrics.max_k_core}, révélant une structure en couches. Le noyau central ({metrics.max_k_core}-core) contient les membres les plus engagés et interconnectés.</p>
                 
-                <p><strong>👑 Nœuds Clés:</strong> Les analyses de centralité révèlent que les nœuds {metrics.top_centralities.betweenness.slice(0, 3).map(n => n.node).join(', ')} sont les plus cruciaux. Le nœud 0 (instructeur) et le nœud 33 (administrateur) dominent plusieurs métriques.</p>
+                <p><strong> Nœuds Clés:</strong> Les analyses de centralité révèlent que les nœuds {metrics.top_centralities.betweenness.slice(0, 3).map(n => n.node).join(', ')} sont les plus cruciaux. Le nœud 0 (instructeur) et le nœud 33 (administrateur) dominent plusieurs métriques.</p>
                 
                 {metrics.diameter && (
-                  <p><strong>📏 Distances:</strong> Le diamètre du réseau est {metrics.diameter} (distance maximale entre deux nœuds) et le rayon est {metrics.radius}. Le chemin moyen de {metrics.avg_shortest_path.toFixed(2)} indique que les membres sont en moyenne à environ {Math.round(metrics.avg_shortest_path)} pas les uns des autres.</p>
+                  <p><strong> Distances:</strong> Le diamètre du réseau est {metrics.diameter} (distance maximale entre deux nœuds) et le rayon est {metrics.radius}. Le chemin moyen de {metrics.avg_shortest_path.toFixed(2)} indique que les membres sont en moyenne à environ {Math.round(metrics.avg_shortest_path)} pas les uns des autres.</p>
                 )}
                 
                 {metrics.assortativity !== null && (
-                  <p><strong>🔀 Assortativité:</strong> Le coefficient d'assortativité de {metrics.assortativity.toFixed(3)} indique {metrics.assortativity > 0 ? 'une tendance des nœuds similaires (en degré) à se connecter ensemble' : 'une tendance des nœuds de degrés différents à se connecter (structure hub-and-spoke)'}.</p>
+                  <p><strong>Assortativité:</strong> Le coefficient d'assortativité de {metrics.assortativity.toFixed(3)} indique {metrics.assortativity > 0 ? 'une tendance des nœuds similaires (en degré) à se connecter ensemble' : 'une tendance des nœuds de degrés différents à se connecter (structure hub-and-spoke)'}.</p>
                 )}
                 
-                <p><strong>⚔️ Contexte Historique:</strong> Ce réseau a capturé la division réelle du club en deux groupes suite à un conflit entre l'instructeur (nœud 0) et l'administrateur (nœud 33). La structure prédisait cette scission avec une précision remarquable, validant les méthodes d'analyse de réseaux sociaux.</p>
+                <p><strong>Contexte Historique:</strong> Ce réseau a capturé la division réelle du club en deux groupes suite à un conflit entre l'instructeur (nœud 0) et l'administrateur (nœud 33). La structure prédisait cette scission avec une précision remarquable, validant les méthodes d'analyse de réseaux sociaux.</p>
               </div>
             )}
           </div>
