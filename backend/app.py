@@ -36,23 +36,47 @@ G = create_karate_graph()
 
 def calculate_3d_positions(graph):
     """Calcule des positions 3D pour les nœuds"""
-    pos_2d = nx.spring_layout(graph, dim=2, seed=42)
+    import random
+    
+    # Si le graphe est vide ou a un seul nœud
+    if graph.number_of_nodes() == 0:
+        return {}
+    
+    if graph.number_of_nodes() == 1:
+        node = list(graph.nodes())[0]
+        return {node: {'x': 0.0, 'y': 0.0, 'z': 0.0}}
+    
+    try:
+        pos_2d = nx.spring_layout(graph, dim=2, seed=42)
+    except:
+        # En cas d'erreur, positions aléatoires
+        pos_2d = {node: (random.uniform(-1, 1), random.uniform(-1, 1)) 
+                  for node in graph.nodes()}
     
     # Ajouter une dimension Z basée sur la centralité
-    betweenness = nx.betweenness_centrality(graph)
+    try:
+        betweenness = nx.betweenness_centrality(graph)
+    except:
+        betweenness = {node: 0 for node in graph.nodes()}
     
     positions_3d = {}
     for node in graph.nodes():
-        x, y = pos_2d[node]
-        z = betweenness[node] * 2  # Hauteur basée sur la centralité
+        # Récupérer les positions avec valeurs par défaut
+        x, y = pos_2d.get(node, (random.uniform(-1, 1), random.uniform(-1, 1)))
+        z = betweenness.get(node, 0) * 2
+        
+        # Vérifier et corriger les NaN
+        x = 0.0 if (np.isnan(x) or np.isinf(x)) else float(x)
+        y = 0.0 if (np.isnan(y) or np.isinf(y)) else float(y)
+        z = 0.0 if (np.isnan(z) or np.isinf(z)) else float(z)
+        
         positions_3d[node] = {
-            'x': float(x * 10),
-            'y': float(y * 10),
-            'z': float(z * 10)
+            'x': x * 10,
+            'y': y * 10,
+            'z': z * 10
         }
     
     return positions_3d
-
 def calculate_all_metrics(graph):
     """
     Calcule TOUTES les métriques demandées dans le projet :

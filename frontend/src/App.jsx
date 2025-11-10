@@ -84,7 +84,6 @@ const App = () => {
       alert('Erreur: ' + err.message);
     }
   };
-
   const addEdge = async () => {
     try {
       const response = await fetch('http://127.0.0.1:5000/api/edge', {
@@ -507,10 +506,6 @@ const App = () => {
               <span style={styles.value}>{metrics?.taille}</span>
             </div>
             <div style={styles.metric}>
-              <span style={styles.label}>DENSITÉ</span>
-              <span style={styles.value}>{metrics?.densite.toFixed(3)}</span>
-            </div>
-            <div style={styles.metric}>
               <span style={styles.label}>TYPE</span>
               <span style={styles.value}>Non orienté</span>
             </div>
@@ -525,14 +520,6 @@ const App = () => {
             <div style={styles.metric}>
               <span style={styles.label}>MAX</span>
               <span style={styles.value}>{metrics?.degree_distribution.max}</span>
-            </div>
-            <div style={styles.metric}>
-              <span style={styles.label}>MOYENNE</span>
-              <span style={styles.value}>{metrics?.degree_distribution.mean.toFixed(2)}</span>
-            </div>
-            <div style={styles.metric}>
-              <span style={styles.label}>MÉDIANE</span>
-              <span style={styles.value}>{metrics?.degree_distribution.median.toFixed(2)}</span>
             </div>
           </div>
 
